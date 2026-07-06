@@ -18,4 +18,4 @@ monitoring figyeli.
 
 ## Kapcsolat
 
-📧 milan.petercsak@gmail.com
+📧 hello@smart-ai.hu

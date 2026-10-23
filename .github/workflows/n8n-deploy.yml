@@ -1,0 +1,70 @@
+name: n8n deploy (közös)
+# Újrahasznosítható telepítő az n8n-automata repókhoz (template-n8n és a belőle indított repók).
+# A hívó repó .github/workflows/deploy-n8n.yml-je hívja; a futás neve, a trigger és a concurrency ott van.
+# A szkriptek a hívó repóban élnek (scripts/n8n, a template-sync tartja azonosan), itt csak a lépések.
+# Kimenet: step summary és a `deploy-eredmeny` artifact (deploy-eredmeny.json, séma: smart-ai/n8n-deploy@1).
+
+on:
+  workflow_call:
+    inputs:
+      mod:
+        description: "eles (ír az n8n-be) vagy proba (csak olvas)"
+        type: string
+        default: eles
+      sha:
+        description: "A telepítendő commit teljes sha-ja (a hívó run-name-jében is ez áll)"
+        type: string
+        required: true
+      n8n-base-url:
+        type: string
+        required: true
+      workflow-ids:
+        description: "N8N_WORKFLOW_IDS: kulcs → n8n workflow-ID JSON-objektum"
+        type: string
+        required: true
+      error-workflow-id:
+        type: string
+        required: true
+      node-version:
+        type: string
+        default: "22"
+    secrets:
+      N8N_API_KEY:
+        required: true
+      N8N_HELYKITOLTOK:
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      # A hívó repó (a github kontextus a hívóé), teljes történettel: az alapcommit a korábbi telepítésből jön.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ inputs.node-version }}
+      - name: Telepítés az n8n-re
+        run: node scripts/n8n/telepit.mjs --mod "$MOD"
+        env:
+          MOD: ${{ inputs.mod }}
+          N8N_BASE_URL: ${{ inputs.n8n-base-url }}
+          N8N_WORKFLOW_IDS: ${{ inputs.workflow-ids }}
+          N8N_ERROR_WORKFLOW_ID: ${{ inputs.error-workflow-id }}
+          N8N_API_KEY: ${{ secrets.N8N_API_KEY }}
+          N8N_HELYKITOLTOK: ${{ secrets.N8N_HELYKITOLTOK }}
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: Eredmény mentése
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: deploy-eredmeny
+          path: deploy-eredmeny.json
+          if-no-files-found: warn
+          retention-days: 90
